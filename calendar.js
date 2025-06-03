@@ -9,7 +9,8 @@ document.addEventListener('DOMContentLoaded', function() {
     currentMonth: document.getElementById('currentMonth'),
     prevMonth: document.getElementById('prevMonth'),
     nextMonth: document.getElementById('nextMonth'),
-    statsContent: document.getElementById('statsContent')
+    statsContent: document.getElementById('statsContent'),
+    monthlyStats: document.getElementById('monthlyStats')
   };
 
   // Initialize calendar
@@ -75,6 +76,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Pre-load history data for visible month
     preloadHistoryData(year, month);
+    
+    // Calculate and display monthly stats
+    calculateMonthlyStats(year, month);
   }
 
   function createDayElement(dayNum, isOtherMonth, date) {
@@ -564,4 +568,88 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Select today when page loads
   selectTodayIfVisible();
+
+  async function calculateMonthlyStats(year, month) {
+    elements.monthlyStats.innerHTML = '<div class="monthly-stats-loading">Loading monthly statistics...</div>';
+    
+    try {
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
+      
+      const monthlyData = {
+        uniquePages: new Set(),
+        totalVisits: 0,
+        totalTime: 0,
+        daysWithData: 0
+      };
+      
+      // Get data for each day of the month
+      for (let day = 1; day <= monthEnd.getDate(); day++) {
+        const date = new Date(year, month, day);
+        try {
+          const analysis = await getHistoryForDate(date);
+          
+          if (analysis.totalVisits > 0) {
+            monthlyData.daysWithData++;
+            monthlyData.totalVisits += analysis.totalVisits;
+            monthlyData.totalTime += analysis.totalTime;
+            
+            // Add unique pages to the set
+            analysis.domains.forEach(domain => {
+              domain.pages.forEach(page => {
+                monthlyData.uniquePages.add(page.url);
+              });
+            });
+          }
+        } catch (error) {
+          // Skip days with errors
+          console.warn(`Failed to load data for ${date.toDateString()}:`, error);
+        }
+      }
+      
+      displayMonthlyStats(monthlyData, monthStart);
+    } catch (error) {
+      elements.monthlyStats.innerHTML = '<div class="monthly-stats-loading">Failed to load monthly statistics</div>';
+    }
+  }
+
+  function displayMonthlyStats(data, monthDate) {
+    // Helper function to format time duration
+    function formatTime(seconds) {
+      if (seconds < 3600) {
+        return `${Math.round(seconds / 60)}m`;
+      } else {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.round((seconds % 3600) / 60);
+        return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+      }
+    }
+
+    const monthName = monthDate.toLocaleDateString('en-US', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+
+    elements.monthlyStats.innerHTML = `
+      <div class="monthly-stats-title">${monthName} Overview</div>
+      <div class="monthly-stats-content">
+        <div class="monthly-stat-item">
+          <span class="monthly-stat-value">${data.uniquePages.size}</span>
+          <div class="monthly-stat-label">Unique Pages</div>
+        </div>
+        <div class="monthly-stat-item">
+          <span class="monthly-stat-value">${data.totalVisits.toLocaleString()}</span>
+          <div class="monthly-stat-label">Total Visits</div>
+        </div>
+        <div class="monthly-stat-item">
+          <span class="monthly-stat-value">${formatTime(data.totalTime)}</span>
+          <div class="monthly-stat-label">Total Time</div>
+        </div>
+        <div class="monthly-stat-item">
+          <span class="monthly-stat-value">${data.daysWithData}</span>
+          <div class="monthly-stat-label">Active Days</div>
+        </div>
+      </div>
+    `;
+  }
 }); 

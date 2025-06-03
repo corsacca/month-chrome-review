@@ -516,6 +516,54 @@
       font-size: 11px;
     }
 
+    /* Monthly stats styles */
+    .monthly-stats {
+      background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      color: white;
+      box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
+    }
+
+    .monthly-stats-content {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 20px;
+    }
+
+    .monthly-stat-item {
+      text-align: center;
+    }
+
+    .monthly-stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .monthly-stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .monthly-stats-loading {
+      text-align: center;
+      opacity: 0.8;
+      font-style: italic;
+    }
+
+    .monthly-stats-title {
+      text-align: center;
+      margin-bottom: 15px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      opacity: 0.95;
+    }
+
     @media (max-width: 1024px) {
       .main-content {
         grid-template-columns: 1fr;
@@ -557,6 +605,9 @@
 
     <div class="main-content">
       <div class="calendar-section">
+        <div class="monthly-stats" id="monthlyStats">
+          <div class="monthly-stats-loading">Loading monthly statistics...</div>
+        </div>
         <div class="calendar-grid" id="calendarGrid">
           <div class="day-header">Mon</div>
           <div class="day-header">Tue</div>
