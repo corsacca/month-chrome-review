@@ -127,57 +127,78 @@ document.addEventListener('DOMContentLoaded', function() {
       maxResults: 10000
     });
     
-    const analysis = analyzeHistoryData(historyItems, date);
+    const analysis = await analyzeHistoryData(historyItems, date, startDate.getTime(), endDate.getTime());
     historyCache.set(dateKey, analysis);
     
     return analysis;
   }
 
-  function analyzeHistoryData(historyItems, targetDate) {
+  async function analyzeHistoryData(historyItems, targetDate, startTime, endTime) {
     const domainData = new Map();
     
-    historyItems.forEach(item => {
+    // Get detailed visit information for each URL
+    const urlVisitPromises = historyItems.map(async (item) => {
       try {
+        const visits = await chrome.history.getVisits({ url: item.url });
+        // Count visits that occurred on the target date
+        const dayVisits = visits.filter(visit => 
+          visit.visitTime >= startTime && visit.visitTime <= endTime
+        );
+        
         const url = new URL(item.url);
-        const domain = url.hostname;
-        
-        if (!domainData.has(domain)) {
-          domainData.set(domain, {
-            domain: domain,
-            visitCount: 0,
-            totalTime: 0,
-            lastVisit: null,
-            urls: new Set(),
-            pages: []
-          });
-        }
-        
-        const domainInfo = domainData.get(domain);
-        domainInfo.visitCount += item.visitCount || 1;
-        domainInfo.urls.add(item.url);
-        
-        // Store detailed page information
-        domainInfo.pages.push({
+        return {
           url: item.url,
+          domain: url.hostname,
           title: item.title || url.pathname,
-          visitCount: item.visitCount || 1,
-          lastVisitTime: item.lastVisitTime
-        });
-        
-        if (item.lastVisitTime) {
-          const visitDate = new Date(item.lastVisitTime);
-          if (!domainInfo.lastVisit || visitDate > domainInfo.lastVisit) {
-            domainInfo.lastVisit = visitDate;
-          }
-        }
+          visitCount: dayVisits.length,
+          lastVisitTime: dayVisits.length > 0 ? Math.max(...dayVisits.map(v => v.visitTime)) : item.lastVisitTime
+        };
       } catch (e) {
         // Skip invalid URLs
+        return null;
+      }
+    });
+    
+    const urlVisitData = (await Promise.all(urlVisitPromises)).filter(data => data && data.visitCount > 0);
+    
+    // Now process the URLs with accurate visit counts
+    urlVisitData.forEach(urlData => {
+      const domain = urlData.domain;
+      
+      if (!domainData.has(domain)) {
+        domainData.set(domain, {
+          domain: domain,
+          visitCount: 0,
+          totalTime: 0,
+          lastVisit: null,
+          urls: new Set(),
+          pages: []
+        });
+      }
+      
+      const domainInfo = domainData.get(domain);
+      domainInfo.visitCount += urlData.visitCount;
+      domainInfo.urls.add(urlData.url);
+      
+      // Store detailed page information
+      domainInfo.pages.push({
+        url: urlData.url,
+        title: urlData.title,
+        visitCount: urlData.visitCount,
+        lastVisitTime: urlData.lastVisitTime
+      });
+      
+      if (urlData.lastVisitTime) {
+        const visitDate = new Date(urlData.lastVisitTime);
+        if (!domainInfo.lastVisit || visitDate > domainInfo.lastVisit) {
+          domainInfo.lastVisit = visitDate;
+        }
       }
     });
     
     // Process pages for each domain
     domainData.forEach((data) => {
-      // Sort pages by visit count, then by last visit time
+      // Sort pages by visit count first, then by last visit time
       data.pages.sort((a, b) => {
         if (b.visitCount !== a.visitCount) {
           return b.visitCount - a.visitCount;
@@ -185,8 +206,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Date(b.lastVisitTime) - new Date(a.lastVisitTime);
       });
       
-      // Estimate time spent
-      data.totalTime = data.visitCount * 2; // 2 minutes per visit estimate
+      // Estimate time spent based on actual visit counts
+      data.totalTime = data.visitCount * 1.5; // 1.5 minutes per visit
     });
     
     const sortedDomains = Array.from(domainData.values())
