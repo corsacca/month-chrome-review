@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let currentDate = new Date();
   let selectedDate = null;
   let historyCache = new Map();
+  let currentViewMode = 'domains'; // 'domains' or 'chronological'
   
   const elements = {
     calendarGrid: document.getElementById('calendarGrid'),
@@ -276,6 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
     return {
       date: targetDate.toDateString(),
       domains: sortedDomains,
+      chronologicalVisits: visitDurations, // Add chronological data
       totalDomains: sortedDomains.length,
       totalVisits: sortedDomains.reduce((sum, domain) => sum + domain.visitCount, 0),
       totalPages: sortedDomains.reduce((sum, domain) => sum + domain.urls.size, 0),
@@ -316,7 +318,68 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="stats-summary">
           ${analysis.totalDomains} domains • ${analysis.totalVisits} visits • ${totalTimeFormatted} total time
         </div>
+        <div class="view-toggle">
+          <button class="toggle-btn ${currentViewMode === 'domains' ? 'active' : ''}" data-view="domains">
+            By Domain
+          </button>
+          <button class="toggle-btn ${currentViewMode === 'chronological' ? 'active' : ''}" data-view="chronological">
+            By Time
+          </button>
+        </div>
       </div>
+      ${currentViewMode === 'domains' ? renderDomainView(analysis) : renderChronologicalView(analysis)}
+    `;
+    
+    elements.statsContent.innerHTML = html;
+    
+    // Add toggle button handlers
+    const toggleButtons = elements.statsContent.querySelectorAll('.toggle-btn');
+    toggleButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const newViewMode = button.dataset.view;
+        if (newViewMode !== currentViewMode) {
+          currentViewMode = newViewMode;
+          displayDayStats(analysis, date);
+        }
+      });
+    });
+
+    if (currentViewMode === 'domains') {
+      // Add click handlers for domain expansion
+      const domainItems = elements.statsContent.querySelectorAll('.domain-item');
+      domainItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleDomainExpansion(item);
+        });
+      });
+    }
+
+    // Prevent page links from triggering other actions
+    const pageLinks = elements.statsContent.querySelectorAll('.page-link');
+    pageLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    });
+  }
+
+  function renderDomainView(analysis) {
+    // Helper function to format time duration
+    function formatTime(seconds) {
+      if (seconds < 60) {
+        return `${Math.round(seconds)}s`;
+      } else if (seconds < 3600) {
+        return `${Math.round(seconds / 60)}m`;
+      } else {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.round((seconds % 3600) / 60);
+        return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+      }
+    }
+
+    return `
       <ul class="domain-list">
         ${analysis.domains.map((domain, index) => `
           <li class="domain-item" data-domain-index="${index}">
@@ -359,25 +422,53 @@ document.addEventListener('DOMContentLoaded', function() {
         `).join('')}
       </ul>
     `;
-    
-    elements.statsContent.innerHTML = html;
-    
-    // Add click handlers for domain expansion
-    const domainItems = elements.statsContent.querySelectorAll('.domain-item');
-    domainItems.forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleDomainExpansion(item);
-      });
-    });
+  }
 
-    // Prevent page links from triggering domain collapse
-    const pageLinks = elements.statsContent.querySelectorAll('.page-link');
-    pageLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.stopPropagation();
+  function renderChronologicalView(analysis) {
+    // Helper function to format time duration
+    function formatTime(seconds) {
+      if (seconds < 60) {
+        return `${Math.round(seconds)}s`;
+      } else if (seconds < 3600) {
+        return `${Math.round(seconds / 60)}m`;
+      } else {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.round((seconds % 3600) / 60);
+        return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+      }
+    }
+
+    // Helper function to format visit time
+    function formatVisitTime(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
       });
-    });
+    }
+
+    return `
+      <ul class="chronological-list">
+        ${analysis.chronologicalVisits.map(visit => `
+          <li class="chronological-item">
+            <div class="visit-time">${formatVisitTime(visit.visitTime)}</div>
+            <div class="visit-content">
+              <div class="visit-title">${escapeHtml(visit.title)}</div>
+              <div class="visit-url">
+                <a href="${escapeHtml(visit.url)}" target="_blank" rel="noopener noreferrer" class="page-link">
+                  ${escapeHtml(visit.url)}
+                </a>
+              </div>
+              <div class="visit-stats">
+                <span class="visit-domain">${visit.domain}</span>
+                <span class="visit-duration">${formatTime(visit.timeSpent)}</span>
+              </div>
+            </div>
+          </li>
+        `).join('')}
+      </ul>
+    `;
   }
 
   function toggleDomainExpansion(domainItem) {
