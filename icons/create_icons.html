@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Icons</title>
+</head>
+<body>
+    <h3>Chrome Extension Icon Generator</h3>
+    <p>Open browser console and run the script to generate icons</p>
+    
+    <script>
+        function createIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#4299e1';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Icon design - simple chart/graph representation
+            ctx.fillStyle = '#ffffff';
+            
+            // Draw bars representing data
+            const barWidth = size / 8;
+            const maxHeight = size * 0.6;
+            const baseY = size * 0.8;
+            
+            // Bar 1
+            ctx.fillRect(size * 0.2, baseY - maxHeight * 0.4, barWidth, maxHeight * 0.4);
+            // Bar 2
+            ctx.fillRect(size * 0.4, baseY - maxHeight * 0.8, barWidth, maxHeight * 0.8);
+            // Bar 3
+            ctx.fillRect(size * 0.6, baseY - maxHeight * 0.6, barWidth, maxHeight * 0.6);
+            
+            // Download the icon
+            const link = document.createElement('a');
+            link.download = `icon${size}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Uncomment and run these in browser console:
+        console.log('Run these commands in console:');
+        console.log('createIcon(16)');
+        console.log('createIcon(48)');
+        console.log('createIcon(128)');
+    </script>
+</body>
+</html> 
