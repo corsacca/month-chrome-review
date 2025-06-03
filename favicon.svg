@@ -1,0 +1,40 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Calendar background -->
+  <rect x="4" y="6" width="24" height="22" rx="2" fill="#4299e1" stroke="#3182ce" stroke-width="1"/>
+  
+  <!-- Calendar header -->
+  <rect x="4" y="6" width="24" height="6" rx="2" fill="#2b6cb0"/>
+  
+  <!-- Calendar rings/holes -->
+  <circle cx="9" cy="4" r="1.5" fill="#718096"/>
+  <circle cx="16" cy="4" r="1.5" fill="#718096"/>
+  <circle cx="23" cy="4" r="1.5" fill="#718096"/>
+  
+  <!-- Calendar grid lines (horizontal) -->
+  <line x1="6" y1="16" x2="26" y2="16" stroke="#e2e8f0" stroke-width="0.5"/>
+  <line x1="6" y1="20" x2="26" y2="20" stroke="#e2e8f0" stroke-width="0.5"/>
+  <line x1="6" y1="24" x2="26" y2="24" stroke="#e2e8f0" stroke-width="0.5"/>
+  
+  <!-- Calendar grid lines (vertical) -->
+  <line x1="10" y1="12" x2="10" y2="26" stroke="#e2e8f0" stroke-width="0.5"/>
+  <line x1="14" y1="12" x2="14" y2="26" stroke="#e2e8f0" stroke-width="0.5"/>
+  <line x1="18" y1="12" x2="18" y2="26" stroke="#e2e8f0" stroke-width="0.5"/>
+  <line x1="22" y1="12" x2="22" y2="26" stroke="#e2e8f0" stroke-width="0.5"/>
+  
+  <!-- Sample calendar dates -->
+  <text x="8" y="15" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">1</text>
+  <text x="12" y="15" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">2</text>
+  <text x="16" y="15" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">3</text>
+  <text x="20" y="15" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">4</text>
+  <text x="24" y="15" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">5</text>
+  
+  <!-- Highlighted active day -->
+  <circle cx="12" cy="19" r="2" fill="#38a169"/>
+  <text x="12" y="20" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle" font-weight="bold">15</text>
+  
+  <!-- More sample dates -->
+  <text x="16" y="19" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">16</text>
+  <text x="20" y="19" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">17</text>
+  <text x="8" y="23" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">22</text>
+  <text x="12" y="23" font-family="Arial, sans-serif" font-size="3" fill="white" text-anchor="middle">23</text>
+</svg> 
