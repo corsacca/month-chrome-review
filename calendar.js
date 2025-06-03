@@ -43,7 +43,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDay = firstDay.getDay();
+    
+    // Adjust starting day for Monday start (0=Sunday, 1=Monday, etc.)
+    // Convert to Monday-based week (0=Monday, 1=Tuesday, ..., 6=Sunday)
+    let startingDay = firstDay.getDay();
+    startingDay = startingDay === 0 ? 6 : startingDay - 1; // Sunday becomes 6, others shift down by 1
     
     // Add previous month's trailing days
     const prevMonthLastDay = new Date(year, month, 0).getDate();
@@ -74,7 +78,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function createDayElement(dayNum, isOtherMonth, date) {
     const dayElement = document.createElement('div');
-    dayElement.className = `calendar-day ${isOtherMonth ? 'other-month' : ''}`;
+    
+    // Check if it's a weekend (Saturday = 6, Sunday = 0)
+    const dayOfWeek = date.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    
+    dayElement.className = `calendar-day ${isOtherMonth ? 'other-month' : ''} ${isWeekend ? 'weekend' : ''}`;
     dayElement.innerHTML = `
       <div class="day-number">${dayNum}</div>
       <div class="day-stats" id="stats-${date.getTime()}"></div>
@@ -135,17 +144,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
   async function analyzeHistoryData(historyItems, targetDate, startTime, endTime) {
     const domainData = new Map();
+    const allVisits = [];
     
     // Get detailed visit information for each URL
     const urlVisitPromises = historyItems.map(async (item) => {
       try {
         const visits = await chrome.history.getVisits({ url: item.url });
-        // Count visits that occurred on the target date
+        // Filter visits that occurred on the target date
         const dayVisits = visits.filter(visit => 
           visit.visitTime >= startTime && visit.visitTime <= endTime
         );
         
         const url = new URL(item.url);
+        
+        // Add each visit to our collection with metadata
+        dayVisits.forEach(visit => {
+          allVisits.push({
+            url: item.url,
+            domain: url.hostname,
+            title: item.title || url.pathname,
+            visitTime: visit.visitTime,
+            transition: visit.transition
+          });
+        });
+        
         return {
           url: item.url,
           domain: url.hostname,
@@ -161,9 +183,38 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const urlVisitData = (await Promise.all(urlVisitPromises)).filter(data => data && data.visitCount > 0);
     
-    // Now process the URLs with accurate visit counts
-    urlVisitData.forEach(urlData => {
-      const domain = urlData.domain;
+    // Sort all visits chronologically to calculate time spent
+    allVisits.sort((a, b) => a.visitTime - b.visitTime);
+    
+    // Calculate time spent for each visit
+    const visitDurations = allVisits.map((visit, index) => {
+      const nextVisit = allVisits[index + 1];
+      let timeSpent;
+      
+      if (nextVisit) {
+        // Time until next page visit
+        timeSpent = (nextVisit.visitTime - visit.visitTime) / 1000; // Convert to seconds
+        
+        // Apply constraints
+        const MAX_SESSION_TIME = 30 * 60; // 30 minutes max
+        const MIN_TIME = 10; // 10 seconds minimum
+        
+        timeSpent = Math.min(timeSpent, MAX_SESSION_TIME);
+        timeSpent = Math.max(timeSpent, MIN_TIME);
+      } else {
+        // Last visit of the day - use default duration
+        timeSpent = 2 * 60; // 2 minutes default
+      }
+      
+      return {
+        ...visit,
+        timeSpent: timeSpent
+      };
+    });
+    
+    // Group by domain and calculate totals
+    visitDurations.forEach(visit => {
+      const domain = visit.domain;
       
       if (!domainData.has(domain)) {
         domainData.set(domain, {
@@ -172,53 +223,63 @@ document.addEventListener('DOMContentLoaded', function() {
           totalTime: 0,
           lastVisit: null,
           urls: new Set(),
-          pages: []
+          pages: new Map() // Changed to Map to accumulate data per URL
         });
       }
       
       const domainInfo = domainData.get(domain);
-      domainInfo.visitCount += urlData.visitCount;
-      domainInfo.urls.add(urlData.url);
+      domainInfo.visitCount += 1;
+      domainInfo.totalTime += visit.timeSpent;
+      domainInfo.urls.add(visit.url);
       
-      // Store detailed page information
-      domainInfo.pages.push({
-        url: urlData.url,
-        title: urlData.title,
-        visitCount: urlData.visitCount,
-        lastVisitTime: urlData.lastVisitTime
-      });
+      // Accumulate page data
+      if (!domainInfo.pages.has(visit.url)) {
+        domainInfo.pages.set(visit.url, {
+          url: visit.url,
+          title: visit.title,
+          visitCount: 0,
+          totalTime: 0,
+          lastVisitTime: visit.visitTime
+        });
+      }
       
-      if (urlData.lastVisitTime) {
-        const visitDate = new Date(urlData.lastVisitTime);
-        if (!domainInfo.lastVisit || visitDate > domainInfo.lastVisit) {
-          domainInfo.lastVisit = visitDate;
-        }
+      const pageInfo = domainInfo.pages.get(visit.url);
+      pageInfo.visitCount += 1;
+      pageInfo.totalTime += visit.timeSpent;
+      
+      if (visit.visitTime > pageInfo.lastVisitTime) {
+        pageInfo.lastVisitTime = visit.visitTime;
+      }
+      
+      const visitDate = new Date(visit.visitTime);
+      if (!domainInfo.lastVisit || visitDate > domainInfo.lastVisit) {
+        domainInfo.lastVisit = visitDate;
       }
     });
     
-    // Process pages for each domain
+    // Convert pages Map to Array and sort
     domainData.forEach((data) => {
-      // Sort pages by visit count first, then by last visit time
-      data.pages.sort((a, b) => {
-        if (b.visitCount !== a.visitCount) {
-          return b.visitCount - a.visitCount;
-        }
-        return new Date(b.lastVisitTime) - new Date(a.lastVisitTime);
-      });
+      data.pages = Array.from(data.pages.values());
       
-      // Estimate time spent based on actual visit counts
-      data.totalTime = data.visitCount * 1.5; // 1.5 minutes per visit
+      // Sort pages by total time spent first, then by visit count
+      data.pages.sort((a, b) => {
+        if (Math.abs(b.totalTime - a.totalTime) > 60) { // If time difference > 1 minute
+          return b.totalTime - a.totalTime;
+        }
+        return b.visitCount - a.visitCount;
+      });
     });
     
     const sortedDomains = Array.from(domainData.values())
-      .sort((a, b) => b.visitCount - a.visitCount);
+      .sort((a, b) => b.totalTime - a.totalTime); // Sort by total time spent
     
     return {
       date: targetDate.toDateString(),
       domains: sortedDomains,
       totalDomains: sortedDomains.length,
       totalVisits: sortedDomains.reduce((sum, domain) => sum + domain.visitCount, 0),
-      totalPages: sortedDomains.reduce((sum, domain) => sum + domain.urls.size, 0)
+      totalPages: sortedDomains.reduce((sum, domain) => sum + domain.urls.size, 0),
+      totalTime: sortedDomains.reduce((sum, domain) => sum + domain.totalTime, 0)
     };
   }
 
@@ -234,11 +295,26 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
+    // Helper function to format time duration
+    function formatTime(seconds) {
+      if (seconds < 60) {
+        return `${Math.round(seconds)}s`;
+      } else if (seconds < 3600) {
+        return `${Math.round(seconds / 60)}m`;
+      } else {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.round((seconds % 3600) / 60);
+        return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+      }
+    }
+
+    const totalTimeFormatted = formatTime(analysis.totalTime);
+
     const html = `
       <div class="stats-header">
         <div class="stats-title">${analysis.date}</div>
         <div class="stats-summary">
-          ${analysis.totalDomains} domains • ${analysis.totalVisits} visits • ${analysis.totalPages} unique pages
+          ${analysis.totalDomains} domains • ${analysis.totalVisits} visits • ${totalTimeFormatted} total time
         </div>
       </div>
       <ul class="domain-list">
@@ -255,7 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <span>visits</span>
                 </div>
                 <div class="stat-item">
-                  <span class="stat-value">~${domain.totalTime}m</span>
+                  <span class="stat-value">${formatTime(domain.totalTime)}</span>
                   <span>time</span>
                 </div>
               </div>
@@ -267,8 +343,15 @@ document.addEventListener('DOMContentLoaded', function() {
               ${domain.pages.map(page => `
                 <div class="page-item">
                   <div class="page-title">${escapeHtml(page.title)}</div>
-                  <div class="page-url">${escapeHtml(page.url)}</div>
-                  <div class="page-visits">${page.visitCount} visit${page.visitCount > 1 ? 's' : ''}</div>
+                  <div class="page-url">
+                    <a href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer" class="page-link">
+                      ${escapeHtml(page.url)}
+                    </a>
+                  </div>
+                  <div class="page-stats">
+                    <span class="page-visits">${page.visitCount} visit${page.visitCount > 1 ? 's' : ''}</span>
+                    <span class="page-time">${formatTime(page.totalTime)} total</span>
+                  </div>
                 </div>
               `).join('')}
             </div>
@@ -285,6 +368,14 @@ document.addEventListener('DOMContentLoaded', function() {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleDomainExpansion(item);
+      });
+    });
+
+    // Prevent page links from triggering domain collapse
+    const pageLinks = elements.statsContent.querySelectorAll('.page-link');
+    pageLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.stopPropagation();
       });
     });
   }
@@ -343,9 +434,23 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (analysis.totalVisits > 0) {
         dayElement.classList.add('has-data');
+        
+        // Helper function to format time for day indicators
+        function formatTimeShort(seconds) {
+          if (seconds < 60) {
+            return `${Math.round(seconds)}s`;
+          } else if (seconds < 3600) {
+            return `${Math.round(seconds / 60)}m`;
+          } else {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.round((seconds % 3600) / 60);
+            return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+          }
+        }
+        
         statsElement.innerHTML = `
           <div>${analysis.totalDomains} sites</div>
-          <div>${analysis.totalVisits} visits</div>
+          <div>${formatTimeShort(analysis.totalTime)}</div>
         `;
       }
     }

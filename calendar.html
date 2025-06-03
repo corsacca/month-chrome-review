@@ -162,6 +162,36 @@
       background: #38a169;
     }
 
+    .calendar-day.weekend {
+      background: #f8f9fa;
+      opacity: 0.7;
+    }
+
+    .calendar-day.weekend:hover {
+      background: #e9ecef;
+      opacity: 0.9;
+    }
+
+    .calendar-day.weekend.selected {
+      background: #6c757d;
+      opacity: 1;
+    }
+
+    .calendar-day.weekend.has-data {
+      background: linear-gradient(135deg, #f1f3f4 0%, #e9ecef 100%);
+      opacity: 0.8;
+    }
+
+    .calendar-day.weekend.has-data:hover {
+      background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+      opacity: 0.9;
+    }
+
+    .calendar-day.weekend.selected.has-data {
+      background: #495057;
+      opacity: 1;
+    }
+
     .day-number {
       font-size: 16px;
       font-weight: 500;
@@ -314,6 +344,17 @@
       overflow: hidden;
     }
 
+    .page-link {
+      color: #4299e1;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .page-link:hover {
+      color: #3182ce;
+      text-decoration: underline;
+    }
+
     .page-visits {
       color: #4299e1;
       font-weight: 500;
@@ -384,13 +425,13 @@
     <div class="main-content">
       <div class="calendar-section">
         <div class="calendar-grid" id="calendarGrid">
-          <div class="day-header">Sun</div>
           <div class="day-header">Mon</div>
           <div class="day-header">Tue</div>
           <div class="day-header">Wed</div>
           <div class="day-header">Thu</div>
           <div class="day-header">Fri</div>
           <div class="day-header">Sat</div>
+          <div class="day-header">Sun</div>
         </div>
       </div>
 
